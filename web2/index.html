@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Recordatorios</title>
+    <!-- Esta línea elimina el error 404 del favicon -->
+    <link rel="icon" href="data:,">
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f4f4f9; padding: 20px; max-width: 600px; margin: auto; color: #333; }
+        h1 { text-align: center; color: #2c3e50; }
+        .card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        input, textarea, button { width: 100%; margin-bottom: 12px; padding: 12px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; }
+        textarea { resize: vertical; min-height: 80px; }
+        button { background: #2c3e50; color: white; border: none; cursor: pointer; font-weight: bold; font-size: 16px; transition: background 0.2s; }
+        button:hover { background: #1a252f; }
+        .recordatorio { border-left: 5px solid #3498db; }
+        .recordatorio.completado { border-left-color: #2ecc71; opacity: 0.7; }
+        .recordatorio.completado h3 { text-decoration: line-through; color: #7f8c8d; }
+        h3 { margin-top: 0; margin-bottom: 5px; }
+        p { margin: 5px 0; color: #555; }
+        .meta { font-size: 0.85em; color: #888; margin-bottom: 15px; }
+        .acciones { display: flex; gap: 8px; }
+        .acciones button { margin-bottom: 0; padding: 8px; font-size: 14px; }
+        .btn-completar { background: #2ecc71; }
+        .btn-completar:hover { background: #27ae60; }
+        .btn-editar { background: #f39c12; }
+        .btn-editar:hover { background: #d68910; }
+        .btn-borrar { background: #e74c3c; }
+        .btn-borrar:hover { background: #c0392b; }
+    </style>
+</head>
+<body>
+    <h1>Mis Recordatorios</h1>
+    
+    <div class="card">
+        <h3 style="margin-bottom: 15px;">Crear Nuevo</h3>
+        <form id="form-recordatorio">
+            <input type="text" id="nombre" placeholder="Nombre del recordatorio" required>
+            <textarea id="descripcion" placeholder="Descripción"></textarea>
+            <input type="datetime-local" id="fecha" required>
+            <input type="url" id="url" placeholder="URL (opcional, ej: https://...)">
+            <button type="submit">Guardar Recordatorio</button>
+        </form>
+    </div>
+
+    <div id="lista">Cargando recordatorios...</div>
+
+    <script>
+        const API_URL = `http://${window.location.hostname}:8090/api/collections/recordatorios/records`;
+        const form = document.getElementById('form-recordatorio');
+        const lista = document.getElementById('lista');
+
+        window.cargar = async () => {
+            try {
+                const res = await fetch(`${API_URL}?sort=-created`);
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.message || 'Error en PocketBase. Revisa que el nombre de la colección sea exacto.');
+                }
+                const data = await res.json();
+                const records = data.items;
+                
+                lista.innerHTML = '';
+                
+                if(records.length === 0) {
+                    lista.innerHTML = '<p style="text-align:center;">No hay recordatorios pendientes.</p>';
+                    return;
+                }
+                
+                records.forEach(r => {
+                    const estaCompletado = r.Completado === true;
+                    const div = document.createElement('div');
+                    div.className = `card recordatorio ${estaCompletado ? 'completado' : ''}`;
+                    
+                    const fechaObj = new Date(r.Fecha_Hora);
+                    const fechaTexto = isNaN(fechaObj) ? 'Fecha no válida' : fechaObj.toLocaleString('es-ES');
+
+                    div.innerHTML = `
+                        <h3>${r.Nombre}</h3>
+                        <p>${r.Descripcion}</p>
+                        <p class="meta">
+                            <strong>Fecha:</strong> ${fechaTexto} <br>
+                            ${r.URL ? `<a href="${r.URL}" target="_blank">Enlace adjunto</a>` : ''}
+                        </p>
+                        <div class="acciones">
+                            <button class="btn-completar" onclick="completar('${r.id}', ${estaCompletado})">
+                                ${estaCompletado ? 'Desmarcar' : 'Completado'}
+                            </button>
+                            <button class="btn-editar" onclick="editar('${r.id}', '${r.Nombre}', '${r.Descripcion}')">Editar</button>
+                            <button class="btn-borrar" onclick="borrar('${r.id}')">Borrar</button>
+                        </div>
+                    `;
+                    lista.appendChild(div);
+                });
+            } catch (error) {
+                lista.innerHTML = `<p style="color:red; text-align:center;"><b>Error de conexión:</b><br>${error.message}</p>`;
+                console.error(error);
+            }
+        };
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = form.querySelector('button');
+            btn.innerText = "Guardando...";
+            
+            const fechaInput = document.getElementById('fecha').value;
+            const fechaObj = new Date(fechaInput);
+            
+            const data = {
+                "Nombre": document.getElementById('nombre').value,
+                "Descripcion": document.getElementById('descripcion').value,
+                "Fecha_Hora": fechaObj.toISOString().replace('T', ' '),
+                "URL": document.getElementById('url').value,
+                "Completado": false
+            };
+            
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(JSON.stringify(errData.data) || 'Fallo al guardar.');
+                }
+                
+                form.reset();
+                window.cargar();
+            } catch (error) {
+                // Aquí estaba el salto de línea roto que causaba el fallo. Ya está solucionado con acentos graves (template literals).
+                alert(`Error al crear el recordatorio: ${error.message}\n\n(Asegúrate de haber creado el campo "Completado" tipo Bool en PocketBase)`);
+            } finally {
+                btn.innerText = "Guardar Recordatorio";
+            }
+        });
+
+        window.completar = async (id, estadoActual) => {
+            try {
+                const res = await fetch(`${API_URL}/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ "Completado": !estadoActual })
+                });
+                if (!res.ok) throw new Error('No se pudo modificar');
+                window.cargar();
+            } catch (e) { alert('Error: ' + e.message); }
+        };
+
+        window.editar = async (id, nombreActual, descActual) => {
+            const nuevoNombre = prompt("Editar Nombre:", nombreActual);
+            if (nuevoNombre === null) return; 
+            const nuevaDesc = prompt("Editar Descripción:", descActual);
+            
+            try {
+                const res = await fetch(`${API_URL}/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        "Nombre": nuevoNombre,
+                        "Descripcion": nuevaDesc !== null ? nuevaDesc : ""
+                    })
+                });
+                if (!res.ok) throw new Error('No se pudo guardar la edición');
+                window.cargar();
+            } catch (e) { alert('Error al editar: ' + e.message); }
+        };
+
+        window.borrar = async (id) => {
+            if(confirm('¿Seguro que quieres borrar este recordatorio permanentemente?')) {
+                try {
+                    const res = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                    if (!res.ok) throw new Error('No se pudo borrar');
+                    window.cargar();
+                } catch (e) { alert('Error al borrar: ' + e.message); }
+            }
+        };
+
+        window.cargar();
+    </script>
+</body>
+</html>

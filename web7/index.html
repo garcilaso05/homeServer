@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b10">
+<title>Stream Privado</title>
+<link rel="icon" href="data:,">
+<style>
+:root{--bg:#0b0b10;--glass:rgba(255,255,255,.06);--glass2:rgba(255,255,255,.1);--line:rgba(255,255,255,.09);--text:#f4f4f6;--muted:#9a9aa8;--accent:#8b8cff;--accent2:#a78bfa;--r:16px;--safe:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{font-family:Inter,"SF Pro Text",system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(900px 500px at 15% -10%,#25235a55,transparent),radial-gradient(700px 400px at 100% 0,#4c1d9533,transparent),var(--bg);color:var(--text);display:flex;flex-direction:column;overflow:hidden;letter-spacing:.005em}
+button,select,input{font:inherit;color:inherit}
+header{display:flex;gap:12px;align-items:center;padding:12px 20px calc(12px);padding-top:calc(12px + env(safe-area-inset-top,0px));background:rgba(11,11,16,.6);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--line);z-index:30}
+.logo{font-weight:700;font-size:17px;letter-spacing:.02em;white-space:nowrap}
+.logo b{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.search{position:relative;flex:1;max-width:560px;min-width:0}
+.search input{width:100%;padding:12px 16px 12px 42px;border-radius:14px;border:1px solid var(--line);background:var(--glass);outline:none;font-size:15px;transition:.2s}
+.search input:focus{border-color:var(--accent);background:var(--glass2)}
+.search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;opacity:.6;pointer-events:none}
+#sugg{position:absolute;top:calc(100% + 8px);left:0;right:0;background:rgba(24,24,34,.92);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:none;z-index:60;box-shadow:0 20px 50px #0009}
+#sugg div{padding:11px 16px;font-size:14px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sugg div:hover,#sugg div.on{background:var(--glass2)}
+#sugg small{color:var(--muted);margin-left:6px}
+.main{display:flex;flex:1;min-height:0}
+aside{width:220px;padding:18px 12px;display:flex;flex-direction:column;gap:6px;border-right:1px solid var(--line)}
+.nav{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;color:var(--muted);font-weight:600;font-size:14px;cursor:pointer;border:0;background:none;text-align:left;transition:.2s}
+.nav:hover{background:var(--glass);color:var(--text)}
+.nav.active{background:var(--glass2);color:var(--text)}
+main{flex:1;min-width:0;overflow-y:auto;padding:24px 28px 190px}
+.head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+h2{margin:0;font-size:24px;font-weight:700;letter-spacing:-.01em;overflow-wrap:anywhere;min-width:0}
+h3{margin:22px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.empty{color:var(--muted);padding:30px 0}
+.list{display:flex;flex-direction:column;gap:8px}
+.track{display:grid;grid-template-columns:52px minmax(0,1fr) auto;align-items:center;gap:6px 14px;padding:10px;border-radius:var(--r);background:var(--glass);border:1px solid transparent;transition:.2s;cursor:pointer}
+.track:hover{background:var(--glass2);border-color:var(--line)}
+.track.playing{border-color:var(--accent)}
+.cover{width:52px;height:52px;border-radius:12px;object-fit:cover;background:#222}
+.info{min-width:0}
+.t{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a{color:var(--muted);font-size:13px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a:hover{color:var(--accent)}
+.dur{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.acts{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;padding-left:66px}
+.chip{background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:12.5px;cursor:pointer;transition:.2s;max-width:100%}
+.chip:hover{background:var(--glass2)}
+.chip.ok{color:#4ade80;border-color:#4ade80}
+select.chip{appearance:none;-webkit-appearance:none;background-color:#1b1b26}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
+.grid .track{grid-template-columns:1fr;padding:12px}
+.grid .cover{width:100%;height:auto;aspect-ratio:1}
+.grid .dur{display:none}
+.pl{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:16px;border-radius:var(--r);background:var(--glass);cursor:pointer;margin-bottom:8px;min-width:0}
+.pl:hover{background:var(--glass2)}
+.pl span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl small{color:var(--muted)}
+.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0b0b10;border:0;font-weight:700}
+/* Reproductor */
+.player{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr);align-items:center;gap:16px;padding:12px 22px calc(12px + var(--safe));background:rgba(14,14,20,.72);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);border-top:1px solid var(--line)}
+.np{display:flex;align-items:center;gap:12px;min-width:0}
+.np img{width:48px;height:48px;border-radius:10px;object-fit:cover;display:none}
+.ctrl{display:flex;justify-content:center;align-items:center;gap:18px}
+.ib{background:none;border:0;cursor:pointer;font-size:19px;padding:6px;opacity:.85;transition:.15s;line-height:1}
+.ib:hover{opacity:1;transform:scale(1.1)}
+.play{width:44px;height:44px;border-radius:50%;background:#fff;color:#0b0b10;display:flex;align-items:center;justify-content:center;opacity:1}
+.seekrow{display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:6px}
+.seekrow span{min-width:34px;text-align:center}
+.right{display:flex;justify-content:flex-end;gap:6px}
+input[type=range].seek{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:22px;background:transparent;cursor:pointer;margin:0;--p:0%}
+.seek::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:linear-gradient(90deg,#fff var(--p),rgba(255,255,255,.18) var(--p))}
+.seek::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;margin-top:-5px;box-shadow:0 2px 8px #0008}
+.seek::-moz-range-track{height:4px;border-radius:4px;background:rgba(255,255,255,.18)}
+.seek::-moz-range-progress{height:4px;border-radius:4px;background:#fff}
+.seek::-moz-range-thumb{width:14px;height:14px;border:0;border-radius:50%;background:#fff}
+/* Letras */
+#lyr{position:fixed;inset:0;z-index:70;display:none;flex-direction:column;background:rgba(8,8,14,.88);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);padding:calc(16px + env(safe-area-inset-top,0px)) 20px calc(16px + var(--safe))}
+#lyr.open{display:flex}
+#lyr .top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+#lyr .top div{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+#lyrBody{flex:1;overflow-y:auto;text-align:center;padding:40vh 0;scrollbar-width:none}
+#lyrBody p{margin:0;padding:10px 8px;font-size:clamp(20px,4.5vw,30px);font-weight:700;color:#ffffff40;transition:.3s;cursor:pointer;overflow-wrap:anywhere}
+#lyrBody p.on{color:#fff;transform:scale(1.04)}
+#lyrBody .plain{color:#fff9;font-size:17px;font-weight:500;cursor:default}
+/* Móvil */
+.mnav{display:none}
+#toast{position:fixed;left:50%;top:80px;transform:translateX(-50%);background:rgba(30,30,44,.95);border:1px solid var(--line);padding:10px 18px;border-radius:999px;font-size:13px;z-index:90;opacity:0;pointer-events:none;transition:.3s;max-width:90vw}
+#toast.on{opacity:1}
+@media(max-width:768px){
+ aside,.logo,.right .hide-m,.player .np+.ctrl .ib.sk{display:none}
+ header{padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top,0px))}
+ main{padding:18px 14px calc(210px + var(--safe))}
+ h2{font-size:20px}
+ .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .acts{padding-left:0}
+ .player{left:10px;right:10px;bottom:calc(72px + var(--safe));border:1px solid var(--line);border-radius:22px;padding:12px 14px;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;box-shadow:0 12px 40px #000a}
+ .ctrl{grid-column:2;grid-row:1;gap:6px}
+ .ctrl .ib{font-size:18px}
+ .player .ctrl>.ib:not(.play){display:none}
+ .player .ctrl>.ib.mob{display:block}
+ .play{width:42px;height:42px}
+ .seekrow{grid-column:1/-1;grid-row:2;margin-top:0}
+ .right{position:absolute;top:-12px;right:14px;display:none}
+ .mnav{display:flex;position:fixed;left:14px;right:14px;bottom:calc(10px + var(--safe));height:56px;z-index:45;background:rgba(20,20,30,.8);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);border:1px solid var(--line);border-radius:22px;justify-content:space-around;align-items:center}
+ .mnav button{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--muted);font-size:11px;padding:6px 14px;min-width:64px;min-height:44px;justify-content:center;cursor:pointer}
+ .mnav button.active{color:var(--text)}
+ .mnav i{font-style:normal;font-size:18px}
+ .lyrbtn{display:block!important}
+}
+</style>
+</head>
+<body>
+<header>
+ <div class="logo">🎧 <b>Stream</b></div>
+ <div class="search">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+  <input type="text" id="q" placeholder="¿Qué quieres escuchar?" autocomplete="off" enterkeyhint="search">
+  <div id="sugg"></div>
+ </div>
+</header>
+
+<div class="main">
+ <aside>
+  <button class="nav active" data-v="home">✦ Inicio</button>
+  <button class="nav" data-v="server">☁ En servidor</button>
+  <button class="nav" data-v="lists">♫ Listas</button>
+ </aside>
+ <main>
+  <div class="head"><h2 id="title">Recomendados</h2><div id="vact"></div></div>
+  <div id="res" class="list"></div>
+ </main>
+</div>
+
+<nav class="mnav">
+ <button class="active" data-v="home"><i>✦</i>Inicio</button>
+ <button data-v="server"><i>☁</i>Servidor</button>
+ <button data-v="lists"><i>♫</i>Listas</button>
+</nav>
+
+<div class="player">
+ <div class="np"><img id="npCover" alt=""><div class="info"><div class="t" id="npT">Nada en reproducción</div><div class="a" id="npA" style="cursor:default">—</div></div></div>
+ <div>
+  <div class="ctrl">
+   <button class="ib mob lyrbtn" id="lyrBtn2" style="display:none" aria-label="Letra">♪</button>
+   <button class="ib sk" id="prev" aria-label="Anterior">⏮</button>
+   <button class="ib play" id="play" aria-label="Reproducir">▶</button>
+   <button class="ib mob" id="next" aria-label="Siguiente">⏭</button>
+  </div>
+  <div class="seekrow"><span id="tc">0:00</span><input type="range" class="seek" id="seek" min="0" max="1000" value="0" step="1" aria-label="Progreso"><span id="tt">0:00</span></div>
+ </div>
+ <div class="right"><button class="chip" id="lyrBtn">♪ Letra</button></div>
+</div>
+
+<div id="lyr">
+ <div class="top"><div id="lyrT"></div><button class="chip" id="lyrX">Cerrar ✕</button></div>
+ <div id="lyrBody"></div>
+</div>
+<div id="toast"></div>
+<audio id="a0" preload="auto"></audio><audio id="a1" preload="auto"></audio>
+
+<script>
+/* =====================================================================
+ POCKETBASE — esquema (ajustar en el panel de administración :8090/_/)
+  - playlists        : nombre (text)                                    [existente]
+  - tracks           : playlist_id, youtube_id, titulo, artista, portada, duracion [existente]
+  - descargas        : youtube_id, titulo, artista, portada, duracion, archivo (file) [existente]
+  - NUEVA playlists_locales : nombre (text, requerido)
+                              descargas (relation → descargas, MÚLTIPLE, sin cascade delete)
+    Reglas API (List/View/Create/Update/Delete) abiertas igual que el resto.
+ BACKEND (opcional): GET /api/suggest?q=  → ["sugerencia", ...]  (si no existe, se usa /search).
+ BACKEND: /stream debe soportar cabecera Range (HTTP 206) para que el seek funcione.
+ RADIO — causas del cuelgue original: (1) tracks del servidor no tienen artist_id y se enviaba
+ "undefined"; (2) sin try/catch ni timeout, un fallo dejaba "Generando Radio..." para siempre;
+ (3) la respuesta no siempre es un array y se accedía a [0].artist sin comprobar;
+ (4) la UI se bloqueaba esperando a yt-dlp. Ahora: fallback por nombre, timeout y normalización.
+===================================================================== */
+const HOST = location.hostname || 'localhost';
+const API = `http://${HOST}:8000/api`, DB = `http://${HOST}:8090/api/collections`, FILES = `http://${HOST}:8090/api/files`;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const J = h => ({'Content-Type':'application/json'});
+const res = $('res');
+let view = {tracks:[], mode:'', ctx:null}, queue = [], idx = -1, pls = [], lpls = [], curView = 'home';
+
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),2200)}
+async function api(url, opt={}, ms=25000){
+  const c = new AbortController(), t = setTimeout(()=>c.abort(), ms);
+  try{ const r = await fetch(url, {...opt, signal:c.signal}); if(!r.ok) throw new Error(r.status); return r.status===204 ? null : await r.json(); }
+  finally{ clearTimeout(t) }
+}
+const pb = (p, o) => api(`${DB}/${p}`, o);
+function norm(t){ const ar = t.artists?.[0];
+  return { youtube_id: t.youtube_id||t.videoId||t.id, title: t.title||t.titulo||'Sin título', artist: t.artist||ar?.name||t.artista||'Desconocido',
+    artist_id: t.artist_id||ar?.id||null, cover: t.cover||t.portada||t.thumbnail||t.thumbnails?.slice(-1)[0]?.url||'', duration: t.duration||t.duracion||'' } }
+const dl = r => ({...norm(r), rid:r.id, file_url:`${FILES}/descargas/${r.id}/${r.archivo}`});
+const shuffle = a => { a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]} return a };
+
+/* ---------- Navegación ---------- */
+function setNav(v){ curView=v; document.querySelectorAll('[data-v]').forEach(b=>b.classList.toggle('active',b.dataset.v===v)) }
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>go(b.dataset.v));
+function go(v){ setNav(v); ({home:verInicio, server:verDescargas, lists:verListas})[v]() }
+function head(t, actions=''){ $('title').textContent=t; $('vact').innerHTML=actions }
+function loading(t){ head(t); res.className='list'; res.innerHTML='<p class="empty">Cargando…</p>' }
+
+/* ---------- Pantalla de inicio (recomendados) ---------- */
+async function verInicio(){
+  loading('Recomendados');
+  let t = [];
+  try{ const d = await pb('descargas/records?perPage=60&sort=-created'); t = shuffle(d.items.map(dl)).slice(0,12) }catch(e){}
+  const rec = JSON.parse(localStorage.getItem('recents')||'[]');
+  if(t.length < 8 && rec.length){
+    try{ const s = (await api(`${API}/search?q=${encodeURIComponent(rec[0])}`)).map(norm); t = t.concat(shuffle(s)).slice(0,12) }catch(e){}
+  }
+  if(curView!=='home') return;
+  head('Recomendados');
+  t.length ? render(t,'home') : (res.className='list', res.innerHTML='<p class="empty">Busca una canción para empezar.</p>');
+}
+
+/* ---------- Búsqueda + sugerencias ---------- */
+const qi = $('q'), sg = $('sugg'); let sTimer, sId = 0, hasSuggest = true, known = new Set();
+function recents(){ return JSON.parse(localStorage.getItem('recents')||'[]') }
+async function buscar(q = qi.value.trim()){
+  if(!q) return; sg.style.display='none'; qi.blur(); setNav('');
+  localStorage.setItem('recents', JSON.stringify([q,...recents().filter(x=>x!==q)].slice(0,10)));
+  loading('Buscando…');
+  try{ const t = (await api(`${API}/search?q=${encodeURIComponent(q)}`)).map(norm); t.forEach(x=>{known.add(x.artist);known.add(x.title)}); head(`Resultados para “${q}”`); render(t,'youtube') }
+  catch(e){ head('Error'); res.innerHTML='<p class="empty">No se pudo conectar con el servidor.</p>' }
+}
+qi.addEventListener('input', ()=>{ clearTimeout(sTimer); const q=qi.value.trim(); if(q.length<2){sg.style.display='none';return} sTimer=setTimeout(()=>suggest(q),250) });
+qi.addEventListener('keydown', e=>{ if(e.key==='Enter') buscar() });
+qi.addEventListener('focus', ()=>{ if(qi.value.trim().length>=2) suggest(qi.value.trim()) });
+document.addEventListener('click', e=>{ if(!e.target.closest('.search')) sg.style.display='none' });
+async function suggest(q){
+  const my = ++sId, lq = q.toLowerCase();
+  let items = [...recents(), ...known].filter(s=>s.toLowerCase().includes(lq)).slice(0,3).map(s=>({s,k:'reciente'}));
+  try{
+    if(hasSuggest){ try{ const r = await api(`${API}/suggest?q=${encodeURIComponent(q)}`,{},6000); items = items.concat(r.map(s=>({s:typeof s==='string'?s:s.text||s.title,k:''}))) }catch(e){ hasSuggest=false } }
+    if(!hasSuggest){ const r = (await api(`${API}/search?q=${encodeURIComponent(q)}`,{},8000)).map(norm).slice(0,6);
+      r.forEach(x=>{known.add(x.artist);known.add(x.title)});
+      items = items.concat([...new Set(r.map(x=>x.artist))].slice(0,2).map(s=>({s,k:'artista'})), r.slice(0,4).map(x=>({s:`${x.title} ${x.artist}`,k:'canción'})).flat()) }
+  }catch(e){}
+  if(my!==sId) return;
+  const seen = new Set(); items = items.filter(i=>i.s && !seen.has(i.s.toLowerCase()) && seen.add(i.s.toLowerCase())).slice(0,7);
+  sg.innerHTML = items.map(i=>`<div data-s="${esc(i.s)}">${esc(i.s)}<small>${i.k}</small></div>`).join('');
+  sg.style.display = items.length ? 'block' : 'none';
+}
+sg.onclick = e => { const d = e.target.closest('[data-s]'); if(d){ qi.value=d.dataset.s; buscar(d.dataset.s) } };
+
+/* ---------- Servidor y playlists ---------- */
+async function verDescargas(){
+  loading('En el servidor');
+  try{ const d = await pb('descargas/records?perPage=200&sort=-created'); if(curView!=='server') return; head('En el servidor'); render(d.items.map(dl),'server') }
+  catch(e){ res.innerHTML='<p class="empty">Error al cargar las descargas.</p>' }
+}
+async function cargarListas(){
+  try{ pls = (await pb('playlists/records?perPage=200')).items }catch(e){ pls=[] }
+  try{ lpls = (await pb('playlists_locales/records?perPage=200')).items }catch(e){ lpls=[] }
+}
+async function verListas(){
+  loading('Tus listas'); await cargarListas(); if(curView!=='lists') return;
+  head('Tus listas'); res.className='';
+  const sec = (label, arr, kind) => `<h3>${label}</h3><button class="chip primary" data-new="${kind}" style="margin-bottom:12px">+ Nueva lista</button>` +
+    (arr.map(p=>`<div class="pl" data-open="${kind}:${p.id}" data-n="${esc(p.nombre)}"><span>♫ ${esc(p.nombre)}</span><small>${kind==='l'?(p.descargas||[]).length+' canciones':'Abrir'}</small></div>`).join('') || '<p class="empty" style="padding:6px 0">Sin listas todavía.</p>');
+  res.innerHTML = sec('Streaming', pls, 's') + sec('Solo descargadas (servidor)', lpls, 'l');
+}
+async function crearLista(kind){
+  const nombre = prompt('Nombre de la nueva lista:'); if(!nombre) return;
+  try{ await pb(kind==='l'?'playlists_locales/records':'playlists/records',{method:'POST',headers:J(),body:JSON.stringify({nombre})}); toast('Lista creada'); verListas() }
+  catch(e){ toast('No se pudo crear la lista') }
+}
+async function abrirLista(kind, id, nombre){
+  loading(nombre);
+  try{
+    let t;
+    if(kind==='s'){ const d = await pb(`tracks/records?perPage=200&filter=(playlist_id='${id}')`); t = d.items.map(r=>({...norm(r),pid:r.id})) }
+    else { const r = await pb(`playlists_locales/records/${id}?expand=descargas`); t = (r.expand?.descargas||[]).map(dl) }
+    head(nombre, `<button class="chip" id="delPl">Eliminar lista</button>`);
+    $('delPl').onclick = async()=>{ if(!confirm('¿Eliminar esta lista?')) return; await pb(`${kind==='l'?'playlists_locales':'playlists'}/records/${id}`,{method:'DELETE'}); toast('Lista eliminada'); go('lists') };
+    render(t, kind==='s'?'pl-s':'pl-l', {kind,id,nombre});
+  }catch(e){ res.innerHTML='<p class="empty">Error al abrir la lista.</p>' }
+}
+async function addToList(t, val){
+  const [k,id] = val.split(':');
+  try{
+    if(k==='s') await pb('tracks/records',{method:'POST',headers:J(),body:JSON.stringify({playlist_id:id,youtube_id:t.youtube_id,titulo:t.title,artista:t.artist,portada:t.cover,duracion:t.duration})});
+    else await pb(`playlists_locales/records/${id}`,{method:'PATCH',headers:J(),body:JSON.stringify({'descargas+':t.rid})});
+    toast('Añadido a la lista');
+  }catch(e){ toast('No se pudo añadir') }
+}
+
+/* ---------- Render de canciones ---------- */
+function render(tracks, mode, ctx=null){
+  view = {tracks, mode, ctx}; res.className = mode==='home' ? 'grid' : 'list'; res.innerHTML='';
+  if(!tracks.length){ res.className='list'; res.innerHTML='<p class="empty">No hay nada por aquí todavía.</p>'; return }
+  const opts = t => `<option value="">＋ Añadir a…</option>` + (pls.length?`<optgroup label="Streaming">${pls.map(p=>`<option value="s:${p.id}">${esc(p.nombre)}</option>`).join('')}</optgroup>`:'') +
+    (t.rid&&lpls.length?`<optgroup label="Descargadas">${lpls.map(p=>`<option value="l:${p.id}">${esc(p.nombre)}</option>`).join('')}</optgroup>`:'');
+  tracks.forEach((t,i)=>{
+    const d = document.createElement('div'); d.className='track'+(isCur(t)?' playing':''); d.dataset.i=i;
+    const acts = mode==='home' ? '' : `<div class="acts">
+      ${t.file_url?'':`<button class="chip" data-act="srv">☁ Servidor</button>`}
+      <button class="chip" data-act="dev">⬇ Dispositivo</button>
+      <select class="chip" data-act="add">${opts(t)}</select>
+      ${mode.startsWith('pl-')?`<button class="chip" data-act="rem">✕ Quitar</button>`:''}</div>`;
+    d.innerHTML = `<img class="cover" loading="lazy" src="${esc(t.cover)}" alt=""><div class="info"><div class="t">${esc(t.title)}</div><div class="a" data-act="radio">${esc(t.artist)}</div></div><div class="dur">${esc(t.duration)}</div>${acts}`;
+    res.appendChild(d);
+  });
+}
+const isCur = t => queue[idx] && queue[idx].youtube_id === t.youtube_id;
+function markPlaying(){ res.querySelectorAll('.track').forEach(r=>r.classList.toggle('playing', !!view.tracks[r.dataset.i] && isCur(view.tracks[r.dataset.i]))) }
+
+res.addEventListener('click', async e=>{
+  const nl = e.target.closest('[data-new]'); if(nl) return crearLista(nl.dataset.new);
+  const op = e.target.closest('[data-open]'); if(op){ const [k,id]=op.dataset.open.split(':'); return abrirLista(k,id,op.dataset.n) }
+  const row = e.target.closest('.track'); if(!row) return;
+  const t = view.tracks[+row.dataset.i], act = e.target.closest('[data-act]')?.dataset.act;
+  if(act==='add') return;
+  if(act==='radio') return radioArtista(t);
+  if(act==='srv') return guardarServidor(t, e.target.closest('button'));
+  if(act==='dev') return location.href = `${API}/download-local?id=${t.youtube_id}&title=${encodeURIComponent(t.title)}`;
+  if(act==='rem'){ try{ const c=view.ctx;
+      if(c.kind==='s') await pb(`tracks/records/${t.pid}`,{method:'DELETE'}); else await pb(`playlists_locales/records/${c.id}`,{method:'PATCH',headers:J(),body:JSON.stringify({'descargas-':t.rid})});
+      view.tracks.splice(+row.dataset.i,1); render(view.tracks,view.mode,c) }catch(_){ toast('No se pudo quitar') } return }
+  queue = [...view.tracks]; load(+row.dataset.i);
+});
+res.addEventListener('change', e=>{ const s=e.target.closest('select[data-act=add]'); if(!s||!s.value) return; addToList(view.tracks[+s.closest('.track').dataset.i], s.value); s.value='' });
+async function guardarServidor(t, b){
+  b.textContent='⏳ Descargando…'; b.disabled=true;
+  try{ await api(`${API}/save-to-db`,{method:'POST',headers:J(),body:JSON.stringify({youtube_id:t.youtube_id,titulo:t.title,artista:t.artist,portada:t.cover,duracion:t.duration})},120000);
+    b.textContent='✓ Guardado'; b.classList.add('ok') }
+  catch(e){ toast('Error al guardar en el servidor'); b.textContent='☁ Servidor'; b.disabled=false }
+}
+
+/* ---------- Radio de artista (corregida) ---------- */
+async function radioArtista(t){
+  const name = t.artist; head(`Radio: ${name}`); setNav(''); res.className='list'; res.innerHTML='<p class="empty">Generando radio…</p>';
+  try{
+    let id = t.artist_id;
+    if(!id){ const s = (await api(`${API}/search?q=${encodeURIComponent(name)}`,{},15000)).map(norm); id = (s.find(x=>x.artist_id)||{}).artist_id; if(!id){ return radioFin(s,name) } }
+    const r = await api(`${API}/artist-radio?artist_id=${encodeURIComponent(id)}`,{},45000);
+    const arr = Array.isArray(r) ? r : (r.tracks||r.items||r.results||[]);
+    const tr = arr.map(norm).filter(x=>x.youtube_id);
+    if(!tr.length) throw new Error('vacío');
+    radioFin(tr,name);
+  }catch(e){ res.innerHTML='<p class="empty">No se pudo generar la radio. Inténtalo de nuevo.</p>'; toast('Radio no disponible') }
+}
+function radioFin(tr, name){ head(`Radio: ${name}`); render(tr,'youtube'); queue=[...tr]; load(0) }
+
+/* ---------- Reproductor: dos <audio> (actual + precarga) ---------- */
+const A = [$('a0'), $('a1')]; let act = 0, preIdx = -1, seeking = false, advancing = false;
+const cur = () => A[act], stby = () => A[1-act];
+const urlOf = t => t.file_url || `${API}/stream?id=${t.youtube_id}`;
+const fmt = s => isNaN(s)||!isFinite(s) ? '0:00' : `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+const durOf = () => { const d = cur().duration; if(d && isFinite(d)) return d; const p=(queue[idx]?.duration||'').split(':').map(Number); return p.length>1&&!p.some(isNaN)?p.reduce((a,b)=>a*60+b,0):0 };
+
+function load(i){
+  if(i<0||i>=queue.length) return; idx=i; advancing=false; const t=queue[i], url=urlOf(t);
+  const reuse = preIdx===i && !!stby().getAttribute('src');
+  if(reuse){ cur().pause(); act=1-act } else { cur().src = url; }
+  stby().removeAttribute('src'); preIdx=-1; stby().load();
+  const p = cur().play();
+  if(p) p.catch(err=>{
+    /* Safari/iOS/Chrome móvil bloquean play() en un <audio> que nunca recibió un gesto del usuario.
+       Si el elemento precargado es rechazado, se reproduce en el que ya estaba "desbloqueado". */
+    if(reuse && err.name==='NotAllowedError'){ const o=stby(); o.src=url; act=1-act; o.play().catch(()=>{}) }
+  });
+  ui(t); lyricsFor(t); markPlaying();
+}
+function ui(t){
+  $('npT').textContent=t.title; $('npA').textContent=t.artist; const c=$('npCover'); c.src=t.cover; c.style.display='block';
+  document.title = `${t.title} · ${t.artist}`;
+  if('mediaSession' in navigator){
+    navigator.mediaSession.metadata = new MediaMetadata({title:t.title,artist:t.artist,album:'Servidor privado',artwork:t.cover?[{src:t.cover,sizes:'512x512',type:'image/jpeg'}]:[]});
+    [['play',toggle],['pause',toggle],['previoustrack',prev],['nexttrack',next],['seekto',d=>seekTo(d.seekTime)]].forEach(([a,f])=>{try{navigator.mediaSession.setActionHandler(a,f)}catch(e){}});
+  }
+}
+function toggle(){ const a=cur(); if(!a.src) return; a.paused ? a.play() : a.pause() }
+function advance(){ if(advancing) return; advancing=true; if(idx<queue.length-1) load(idx+1); else advancing=false }
+/* Desbloqueo del 2º <audio> en el primer gesto del usuario (necesario en móvil para encadenar pistas sin intervención) */
+const SILENCE='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=';
+function unlock(){ ['pointerdown','touchstart','keydown'].forEach(ev=>document.removeEventListener(ev,unlock,true));
+  const s=A[1]; if(s.getAttribute('src')) return; s.src=SILENCE; const p=s.play(); const done=()=>{ if(s.src===SILENCE||s.src.startsWith('data:audio/wav')){ s.pause(); s.removeAttribute('src'); s.load() } };
+  p ? p.then(done).catch(done) : done() }
+['pointerdown','touchstart','keydown'].forEach(ev=>document.addEventListener(ev,unlock,true));
+const prev = () => { if(cur().currentTime>3) seekTo(0); else load(idx-1) };
+const next = () => { if(idx<queue.length-1) load(idx+1) };
+function seekTo(s){ cur().currentTime = s; paint(); lyrSync(true) }
+$('play').onclick=toggle; $('prev').onclick=prev; $('next').onclick=next;
+
+A.forEach(a=>{
+  a.addEventListener('play',()=>{ if(a===cur()) $('play').textContent='⏸' });
+  a.addEventListener('pause',()=>{ if(a===cur()) $('play').textContent='▶' });
+  a.addEventListener('ended',()=>{ if(a===cur()) advance() });
+  a.addEventListener('error',()=>{ if(a===cur()&&a.src){ toast('Error de reproducción, saltando…'); setTimeout(next,800) } });
+  a.addEventListener('timeupdate',()=>{ if(a!==cur()) return; if(!seeking) paint(); lyrSync(false); preload();
+    /* Red de seguridad: si la siguiente ya está precargada, se salta justo al final aunque 'ended' no llegue */
+    if(isFinite(a.duration) && a.duration>0 && a.duration-a.currentTime<0.15 && preIdx===idx+1) advance() });
+  a.addEventListener('loadedmetadata',()=>{ if(a===cur()) paint() });
+});
+/* Precarga: 20 s antes del final se pide el enlace de la siguiente al <audio> en espera */
+function preload(){
+  const d = durOf(); if(!d || idx>=queue.length-1 || preIdx===idx+1) return;
+  if(d - cur().currentTime <= 20){ preIdx = idx+1; const s = stby(); s.src = urlOf(queue[preIdx]); s.preload='auto'; s.load() }
+}
+/* Barra interactiva */
+const sk = $('seek');
+function paint(){ const d=durOf(), c=cur().currentTime||0, p = d ? c/d*1000 : 0; sk.value=p; sk.style.setProperty('--p',(p/10)+'%'); $('tc').textContent=fmt(c); $('tt').textContent=fmt(d);
+  if('mediaSession' in navigator && d && navigator.mediaSession.setPositionState){ try{navigator.mediaSession.setPositionState({duration:d,position:Math.min(c,d),playbackRate:1})}catch(e){} } }
+sk.addEventListener('input',()=>{ seeking=true; const d=durOf(); if(!d) return; const t=sk.value/1000*d; sk.style.setProperty('--p',(sk.value/10)+'%'); $('tc').textContent=fmt(t); cur().currentTime=t; lyrSync(true) });
+['change','pointerup','touchend'].forEach(ev=>sk.addEventListener(ev,()=>{ seeking=false }));
+
+/* ---------- Letras sincronizadas (LrcLib) ---------- */
+let lrc = [], lrcPlain = '', lrcKey = '', lrcCur = -1; const lb = $('lyrBody');
+function parseLrc(txt){ const out=[];
+  txt.split(/\r?\n/).forEach(l=>{ const stamps=[...l.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)]; const text=l.replace(/\[[^\]]*\]/g,'').trim();
+    stamps.forEach(m=>out.push({t:(+m[1])*60+parseFloat(m[2]),s:text})) });
+  return out.sort((a,b)=>a.t-b.t) }
+async function lyricsFor(t){
+  const key = t.artist+'|'+t.title; if(key===lrcKey) return; lrcKey=key; lrc=[]; lrcPlain=''; lrcCur=-1;
+  if($('lyr').classList.contains('open')) await fetchLyrics(t, key);
+}
+async function fetchLyrics(t, key){
+  lb.innerHTML='<p class="plain">Buscando letra…</p>'; $('lyrT').textContent=`${t.title} — ${t.artist}`;
+  const clean = s => s.replace(/\(.*?\)|\[.*?\]|official.*|video.*|lyrics?/gi,'').trim();
+  let d = null;
+  try{ d = await api(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(clean(t.artist))}&track_name=${encodeURIComponent(clean(t.title))}`,{},10000) }catch(e){}
+  if(!d||(!d.syncedLyrics&&!d.plainLyrics)){ try{ const r = await api(`https://lrclib.net/api/search?q=${encodeURIComponent(clean(t.artist)+' '+clean(t.title))}`,{},10000); d = r.find(x=>x.syncedLyrics)||r.find(x=>x.plainLyrics) }catch(e){} }
+  if(key!==lrcKey) return;
+  if(d?.syncedLyrics){ lrc=parseLrc(d.syncedLyrics); lb.innerHTML=lrc.map((l,i)=>`<p data-i="${i}">${esc(l.s)||'♪'}</p>`).join(''); lrcCur=-1; lrcSync(true) }
+  else if(d?.plainLyrics){ lb.innerHTML=`<p class="plain">${esc(d.plainLyrics).replace(/\n/g,'<br>')}</p>` }
+  else lb.innerHTML='<p class="plain">No se encontró la letra de esta canción.</p>';
+}
+function lrcSync(force){ if(!lrc.length) return; const c=cur().currentTime+0.2; let i=-1; for(let k=0;k<lrc.length;k++){ if(lrc[k].t<=c) i=k; else break }
+  if(i===lrcCur && !force) return; lrcCur=i; lb.querySelectorAll('p.on').forEach(p=>p.classList.remove('on'));
+  const el = lb.querySelector(`p[data-i="${i}"]`); if(el){ el.classList.add('on'); el.scrollIntoView({block:'center',behavior:force?'auto':'smooth'}) } }
+function lyrSync(force){ if($('lyr').classList.contains('open')) lrcSync(force) }
+lb.addEventListener('click',e=>{ const p=e.target.closest('p[data-i]'); if(p) seekTo(lrc[+p.dataset.i].t) });
+function openLyrics(){ const t=queue[idx]; if(!t){ toast('Reproduce una canción primero'); return } $('lyr').classList.add('open'); lrcKey=''; lrcKey=t.artist+'|'+t.title; fetchLyrics(t,lrcKey) }
+$('lyrBtn').onclick=$('lyrBtn2').onclick=openLyrics; $('lyrX').onclick=()=>$('lyr').classList.remove('open');
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') $('lyr').classList.remove('open') });
+
+/* ---------- Inicio ---------- */
+cargarListas().then(()=>verInicio());
+</script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Galería</title>
+    <link rel="icon" href="data:,">
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f4f4f9; padding: 20px; max-width: 800px; margin: auto; color: #333; }
+        h1 { text-align: center; color: #2c3e50; }
+        .card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        input, textarea, button { width: 100%; margin-bottom: 12px; padding: 12px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; }
+        textarea { resize: vertical; min-height: 80px; }
+        input[type="file"] { padding: 8px; background: #f9f9f9; }
+        button { background: #2c3e50; color: white; border: none; cursor: pointer; font-weight: bold; font-size: 16px; transition: background 0.2s; }
+        button:hover { background: #1a252f; }
+        .post { border-left: 5px solid #8e44ad; }
+        .post h3 { margin-top: 0; margin-bottom: 5px; color: #2c3e50; }
+        .post p { margin: 5px 0; color: #555; }
+        .meta { font-size: 0.85em; color: #888; margin-bottom: 15px; }
+        .galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 15px; }
+        .galeria img { width: 100%; height: 150px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #eee; transition: transform 0.2s; }
+        .galeria img:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <h1>Mis Paquetes de Fotos</h1>
+    
+    <div class="card">
+        <h3 style="margin-bottom: 15px;">Subir Nuevo Paquete</h3>
+        <form id="form-fotos">
+            <input type="text" id="titulo" placeholder="Título (Obligatorio)" required>
+            <textarea id="descripcion" placeholder="Descripción"></textarea>
+            <input type="datetime-local" id="fecha">
+            <label style="display:block; margin-bottom:5px; font-size:14px; font-weight:bold; color:#555;">Selecciona tus fotos (Obligatorio, máx 99):</label>
+            <input type="file" id="imagenes" accept="image/*" multiple required>
+            <button type="submit">Subir Fotos</button>
+        </form>
+    </div>
+
+    <div id="lista">Cargando galería...</div>
+
+    <script>
+        const POCKETBASE_HOST = `http://${window.location.hostname}:8090`;
+        const API_URL = `${POCKETBASE_HOST}/api/collections/MisFotos/records`;
+        const form = document.getElementById('form-fotos');
+        const lista = document.getElementById('lista');
+
+        window.cargar = async () => {
+            try {
+                const res = await fetch(`${API_URL}?sort=-created`);
+                if (!res.ok) throw new Error('Error al conectar con PocketBase. Revisa las API Rules de la colección MisFotos.');
+                const data = await res.json();
+                const records = data.items;
+                
+                lista.innerHTML = '';
+                
+                if(records.length === 0) {
+                    lista.innerHTML = '<p style="text-align:center;">No hay fotos todavía.</p>';
+                    return;
+                }
+                
+                records.forEach(r => {
+                    const div = document.createElement('div');
+                    div.className = 'card post';
+                    
+                    const fechaObj = new Date(r.Fecha);
+                    const fechaTexto = isNaN(fechaObj) ? 'Sin fecha específica' : fechaObj.toLocaleString('es-ES');
+
+                    // Generar la URL pública para cada archivo de imagen
+                    let imagenesHTML = '<div class="galeria">';
+                    if (r.Imagenes && Array.isArray(r.Imagenes)) {
+                        r.Imagenes.forEach(img => {
+                            const imgUrl = `${POCKETBASE_HOST}/api/files/MisFotos/${r.id}/${img}`;
+                            imagenesHTML += `<a href="${imgUrl}" target="_blank"><img src="${imgUrl}" loading="lazy" alt="Foto adjunta"></a>`;
+                        });
+                    }
+                    imagenesHTML += '</div>';
+
+                    div.innerHTML = `
+                        <h3>${r.Titulo}</h3>
+                        <p>${r.Descripcion || ''}</p>
+                        <p class="meta"><strong>Fecha:</strong> ${fechaTexto}</p>
+                        ${imagenesHTML}
+                    `;
+                    lista.appendChild(div);
+                });
+            } catch (error) {
+                lista.innerHTML = `<p style="color:red; text-align:center;"><b>Error:</b><br>${error.message}</p>`;
+            }
+        };
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = form.querySelector('button');
+            btn.innerText = "Subiendo (puede tardar según el tamaño)...";
+            
+            // Empaquetado binario mediante FormData
+            const formData = new FormData();
+            formData.append('Titulo', document.getElementById('titulo').value);
+            formData.append('Descripcion', document.getElementById('descripcion').value);
+            
+            const fechaInput = document.getElementById('fecha').value;
+            if (fechaInput) {
+                const fechaObj = new Date(fechaInput);
+                formData.append('Fecha', fechaObj.toISOString().replace('T', ' '));
+            }
+
+            // Añadir cada archivo seleccionado con el nombre clave 'Imagenes'
+            const archivos = document.getElementById('imagenes').files;
+            for (let i = 0; i < archivos.length; i++) {
+                formData.append('Imagenes', archivos[i]);
+            }
+            
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    body: formData 
+                    // No enviamos header de 'Content-Type'. Al pasar formData, 
+                    // fetch configura automáticamente 'multipart/form-data' y los límites.
+                });
+                
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(JSON.stringify(errData.data) || 'Fallo al subir los archivos.');
+                }
+                
+                form.reset();
+                window.cargar();
+            } catch (error) {
+                alert(`Error al publicar: ${error.message}`);
+            } finally {
+                btn.innerText = "Subir Fotos";
+            }
+        });
+
+        window.cargar();
+    </script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Nube Privada</title>
+    <link rel="icon" href="data:,">
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #f4f4f9; padding: 20px; max-width: 900px; margin: auto; color: #333; }
+        h1 { color: #2c3e50; display: flex; justify-content: space-between; align-items: center; }
+        .toolbar { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; gap: 10px; margin-bottom: 20px; align-items: center;}
+        button { background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #2980b9; }
+        .btn-peligro { background: #e74c3c; padding: 5px 10px; font-size: 12px; margin-left: auto; }
+        .btn-peligro:hover { background: #c0392b; }
+        
+        .breadcrumb { font-size: 18px; font-weight: bold; margin-bottom: 20px; color: #555; }
+        .breadcrumb span { cursor: pointer; color: #3498db; }
+        .breadcrumb span:hover { text-decoration: underline; }
+
+        .grid-archivos { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .item { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: center; text-align: center; border: 1px solid transparent; transition: 0.2s; }
+        .item:hover { border-color: #3498db; }
+        .item-icono { font-size: 40px; margin-bottom: 10px; cursor: pointer; }
+        .item-nombre { font-size: 14px; word-break: break-all; margin-bottom: 10px; font-weight: 500; cursor: pointer; width: 100%;}
+        
+        #file-input { display: none; }
+    </style>
+</head>
+<body>
+    <h1>☁️ Mi Nube Privada</h1>
+    
+    <div class="toolbar">
+        <button onclick="crearCarpeta()">+ Nueva Carpeta</button>
+        <button onclick="document.getElementById('file-input').click()">⬆️ Subir Archivo</button>
+        <input type="file" id="file-input" onchange="subirArchivo(event)">
+    </div>
+
+    <div class="breadcrumb" id="breadcrumb">
+        <span onclick="navegar('')">Inicio</span>
+    </div>
+
+    <div class="grid-archivos" id="contenedor">Cargando...</div>
+
+    <script>
+        const POCKETBASE_HOST = `http://${window.location.hostname}:8090`;
+        const API_URL = `${POCKETBASE_HOST}/api/collections/Drive/records`;
+        
+        let carpetaActual = ""; 
+        let ruta = [{ id: "", nombre: "Inicio" }];
+
+        const contenedor = document.getElementById('contenedor');
+        const breadcrumb = document.getElementById('breadcrumb');
+
+        // Renderiza la barra de navegación (Migas de pan)
+        function actualizarRuta() {
+            breadcrumb.innerHTML = ruta.map((r, index) => {
+                return `<span onclick="volverA(${index})">${r.nombre}</span>`;
+            }).join(' / ');
+        }
+
+        function volverA(index) {
+            ruta = ruta.slice(0, index + 1);
+            carpetaActual = ruta[ruta.length - 1].id;
+            cargarArchivos();
+        }
+
+        // Carga los elementos de la carpeta actual usando el filtro de PocketBase
+        window.cargarArchivos = async () => {
+            actualizarRuta();
+            contenedor.innerHTML = 'Cargando...';
+            try {
+                // Filtramos donde el padre sea la carpeta en la que estamos
+                const res = await fetch(`${API_URL}?filter=(padre='${carpetaActual}')&sort=-es_carpeta,nombre`);
+                if (!res.ok) throw new Error('Error al conectar con la base de datos.');
+                const data = await res.json();
+                
+                contenedor.innerHTML = '';
+                if(data.items.length === 0) {
+                    contenedor.innerHTML = '<p style="grid-column: 1 / -1; text-align:center; color:#888;">Carpeta vacía</p>';
+                    return;
+                }
+
+                data.items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'item';
+                    
+                    if(item.es_carpeta) {
+                        div.innerHTML = `
+                            <div class="item-icono" onclick="entrarCarpeta('${item.id}', '${item.nombre.replace(/'/g, "\\'")}')">📁</div>
+                            <div class="item-nombre" onclick="entrarCarpeta('${item.id}', '${item.nombre.replace(/'/g, "\\'")}')">${item.nombre}</div>
+                            <button class="btn-peligro" onclick="borrarItem('${item.id}', true)">Borrar</button>
+                        `;
+                    } else {
+                        const fileUrl = `${POCKETBASE_HOST}/api/files/Drive/${item.id}/${item.archivo}`;
+                        div.innerHTML = `
+                            <div class="item-icono" onclick="window.open('${fileUrl}', '_blank')">📄</div>
+                            <div class="item-nombre" onclick="window.open('${fileUrl}', '_blank')">${item.nombre}</div>
+                            <button class="btn-peligro" onclick="borrarItem('${item.id}', false)">Borrar</button>
+                        `;
+                    }
+                    contenedor.appendChild(div);
+                });
+            } catch (error) {
+                contenedor.innerHTML = `<p style="color:red;">${error.message}</p>`;
+            }
+        };
+
+        window.entrarCarpeta = (id, nombre) => {
+            carpetaActual = id;
+            ruta.push({ id, nombre });
+            cargarArchivos();
+        };
+
+        window.crearCarpeta = async () => {
+            const nombre = prompt("Nombre de la nueva carpeta:");
+            if(!nombre) return;
+
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, es_carpeta: true, padre: carpetaActual })
+                });
+                cargarArchivos();
+            } catch (error) { alert('Error al crear la carpeta'); }
+        };
+
+        window.subirArchivo = async (event) => {
+            const file = event.target.files[0];
+            if(!file) return;
+
+            const formData = new FormData();
+            formData.append('nombre', file.name);
+            formData.append('es_carpeta', false);
+            formData.append('padre', carpetaActual);
+            formData.append('archivo', file);
+
+            contenedor.innerHTML = 'Subiendo archivo...';
+            try {
+                await fetch(API_URL, { method: 'POST', body: formData });
+                cargarArchivos();
+            } catch (error) { alert('Error al subir el archivo'); cargarArchivos(); }
+            
+            event.target.value = ''; // Resetear el input
+        };
+
+        window.borrarItem = async (id, esCarpeta) => {
+            if(esCarpeta && !confirm("Si borras esta carpeta, los archivos de su interior quedarán huérfanos en la base de datos. ¿Continuar?")) return;
+            if(!esCarpeta && !confirm("¿Seguro que quieres borrar este archivo?")) return;
+
+            try {
+                await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                cargarArchivos();
+            } catch (error) { alert('Error al borrar'); }
+        };
+
+        // Iniciar
+        cargarArchivos();
+    </script>
+</body>
+</html>

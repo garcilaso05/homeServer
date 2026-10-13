@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Snippets</title>
+    <link rel="icon" href="data:,">
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #1e1e2e; color: #cdd6f4; padding: 20px; max-width: 900px; margin: auto; }
+        h1 { color: #89b4fa; text-align: center; margin-bottom: 30px; }
+        
+        .formulario { background: #313244; padding: 20px; border-radius: 10px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .fila { display: flex; gap: 15px; margin-bottom: 15px; }
+        .fila input { flex: 1; }
+        
+        input, textarea, select { width: 100%; padding: 12px; box-sizing: border-box; background: #181825; border: 1px solid #45475a; color: #cdd6f4; border-radius: 6px; font-family: inherit; }
+        input:focus, textarea:focus { outline: none; border-color: #89b4fa; }
+        textarea { resize: vertical; min-height: 120px; font-family: 'Courier New', Courier, monospace; }
+        
+        button { background: #89b4fa; color: #11111b; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; width: 100%; }
+        button:hover { background: #b4befe; }
+        .btn-cancelar { background: #f38ba8; margin-top: 10px; display: none; }
+        .btn-cancelar:hover { background: #eba0ac; }
+
+        .grid-snippets { display: flex; flex-direction: column; gap: 20px; }
+        .snippet-card { background: #313244; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .snippet-header { background: #181825; padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #45475a; }
+        .snippet-header h3 { margin: 0; color: #89b4fa; font-size: 18px; }
+        .badge-lenguaje { background: #cba6f7; color: #11111b; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+        
+        .snippet-body { padding: 15px; }
+        .descripcion { margin-top: 0; margin-bottom: 15px; color: #bac2de; font-size: 14px; }
+        
+        pre { background: #11111b; padding: 15px; border-radius: 6px; overflow-x: auto; margin: 0; border: 1px solid #45475a; }
+        code { font-family: 'Courier New', Courier, monospace; font-size: 14px; color: #a6e3a1; }
+        
+        .snippet-footer { padding: 15px; background: #181825; display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid #45475a; }
+        .btn-accion { width: auto; padding: 8px 15px; font-size: 14px; border-radius: 4px; }
+        .btn-copiar { background: #a6e3a1; color: #11111b; }
+        .btn-copiar:hover { background: #94e2d5; }
+        .btn-editar { background: #f9e2af; color: #11111b; }
+        .btn-editar:hover { background: #f5e0dc; }
+        .btn-borrar { background: #f38ba8; color: #11111b; }
+        .btn-borrar:hover { background: #eba0ac; }
+
+        @media (max-width: 600px) {
+            .fila { flex-direction: column; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>{ } Mis Snippets</h1>
+    
+    <div class="formulario">
+        <form id="form-snippet">
+            <input type="hidden" id="snippet-id">
+            <div class="fila">
+                <input type="text" id="titulo" placeholder="Título (Ej: Recargar configuración de Hyprland)" required>
+                <input type="text" id="lenguaje" placeholder="Lenguaje (Ej: bash, zsh, systemverilog...)" required style="max-width: 250px;">
+            </div>
+            <textarea id="codigo" placeholder="Pega tu código o comando aquí...&#10;Ej: hyprctl reload" required></textarea>
+            <input type="text" id="descripcion" placeholder="Descripción breve (Opcional)" style="margin-top: 15px;">
+            <button type="submit" id="btn-submit" style="margin-top: 15px;">Guardar Snippet</button>
+            <button type="button" class="btn-cancelar" id="btn-cancelar" onclick="cancelarEdicion()">Cancelar Edición</button>
+        </form>
+    </div>
+
+    <div class="grid-snippets" id="contenedor">Cargando snippets...</div>
+
+    <script>
+        const API_URL = `http://${window.location.hostname}:8090/api/collections/Snippets/records`;
+        const form = document.getElementById('form-snippet');
+        const contenedor = document.getElementById('contenedor');
+        const btnSubmit = document.getElementById('btn-submit');
+        const btnCancelar = document.getElementById('btn-cancelar');
+
+        window.cargar = async () => {
+            try {
+                const res = await fetch(`${API_URL}?sort=-created`);
+                const data = await res.json();
+                
+                contenedor.innerHTML = '';
+                if(data.items.length === 0) {
+                    contenedor.innerHTML = '<p style="text-align:center; color:#bac2de;">No hay ningún snippet guardado todavía.</p>';
+                    return;
+                }
+
+                data.items.forEach(r => {
+                    const div = document.createElement('div');
+                    div.className = 'snippet-card';
+                    
+                    // Escapar caracteres HTML para evitar que el código se ejecute en el navegador
+                    const codigoSeguro = r.Codigo.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    
+                    div.innerHTML = `
+                        <div class="snippet-header">
+                            <h3>${r.Titulo}</h3>
+                            <span class="badge-lenguaje">${r.Lenguaje}</span>
+                        </div>
+                        <div class="snippet-body">
+                            ${r.Descripcion ? `<p class="descripcion">${r.Descripcion}</p>` : ''}
+                            <pre><code>${codigoSeguro}</code></pre>
+                        </div>
+                        <div class="snippet-footer">
+                            <button class="btn-accion btn-copiar" id="copiar-${r.id}" onclick="copiarCodigo('${r.id}', \`${r.Codigo.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">Copiar</button>
+                            <button class="btn-accion btn-editar" onclick="prepararEdicion('${r.id}')">Editar</button>
+                            <button class="btn-accion btn-borrar" onclick="borrar('${r.id}')">Borrar</button>
+                        </div>
+                    `;
+                    contenedor.appendChild(div);
+                });
+            } catch (error) {
+                contenedor.innerHTML = `<p style="color:#f38ba8; text-align:center;">Error de conexión con PocketBase.</p>`;
+            }
+        };
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            btnSubmit.innerText = "Guardando...";
+            
+            const idActual = document.getElementById('snippet-id').value;
+            const data = {
+                "Titulo": document.getElementById('titulo').value,
+                "Lenguaje": document.getElementById('lenguaje').value,
+                "Codigo": document.getElementById('codigo').value,
+                "Descripcion": document.getElementById('descripcion').value
+            };
+            
+            try {
+                if(idActual) {
+                    // Actualizar
+                    await fetch(`${API_URL}/${idActual}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    // Crear nuevo
+                    await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                }
+                
+                cancelarEdicion();
+                window.cargar();
+            } catch (error) {
+                alert('Error al guardar el snippet.');
+            } finally {
+                if(!idActual) btnSubmit.innerText = "Guardar Snippet";
+            }
+        });
+
+        window.copiarCodigo = (idBtn, codigo) => {
+            navigator.clipboard.writeText(codigo).then(() => {
+                const btn = document.getElementById(`copiar-${idBtn}`);
+                const textoOriginal = btn.innerText;
+                btn.innerText = "¡Copiado!";
+                btn.style.background = "#89dceb";
+                setTimeout(() => {
+                    btn.innerText = textoOriginal;
+                    btn.style.background = "#a6e3a1";
+                }, 2000);
+            });
+        };
+
+        window.prepararEdicion = async (id) => {
+            try {
+                const res = await fetch(`${API_URL}/${id}`);
+                const data = await res.json();
+                
+                document.getElementById('snippet-id').value = data.id;
+                document.getElementById('titulo').value = data.Titulo;
+                document.getElementById('lenguaje').value = data.Lenguaje;
+                document.getElementById('codigo').value = data.Codigo;
+                document.getElementById('descripcion').value = data.Descripcion || "";
+                
+                btnSubmit.innerText = "Actualizar Snippet";
+                btnCancelar.style.display = "block";
+                
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch(e) {
+                alert("Error al cargar los datos para editar");
+            }
+        };
+
+        window.cancelarEdicion = () => {
+            form.reset();
+            document.getElementById('snippet-id').value = "";
+            btnSubmit.innerText = "Guardar Snippet";
+            btnCancelar.style.display = "none";
+        };
+
+        window.borrar = async (id) => {
+            if(confirm('¿Borrar este snippet de forma permanente?')) {
+                try {
+                    await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                    window.cargar();
+                } catch (e) { alert('Error al borrar'); }
+            }
+        };
+
+        window.cargar();
+    </script>
+</body>
+</html>

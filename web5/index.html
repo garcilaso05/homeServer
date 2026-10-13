@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buzón Efímero</title>
+    <link rel="icon" href="data:,">
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #2c3e50; color: white; padding: 20px; max-width: 600px; margin: auto; text-align: center; }
+        h1 { margin-bottom: 5px; }
+        p.subtitulo { color: #bdc3c7; margin-bottom: 30px; font-size: 14px; }
+        
+        .caja-subida { background: rgba(255, 255, 255, 0.1); padding: 30px; border-radius: 12px; border: 2px dashed #bdc3c7; margin-bottom: 30px; transition: 0.3s; }
+        .caja-subida:hover { background: rgba(255, 255, 255, 0.15); border-color: white; }
+        input[type="file"] { display: none; }
+        .btn-subir { background: #2ecc71; color: white; padding: 12px 24px; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-subir:hover { background: #27ae60; transform: scale(1.05); }
+
+        .lista-archivos { display: flex; flex-direction: column; gap: 15px; text-align: left; }
+        .archivo { background: white; color: #333; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .archivo-info { display: flex; flex-direction: column; overflow: hidden; }
+        .archivo-nombre { font-weight: bold; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px; }
+        .archivo-peso { font-size: 12px; color: #7f8c8d; margin-top: 4px; }
+        
+        .btn-descargar { background: #e74c3c; color: white; padding: 10px 15px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; white-space: nowrap; }
+        .btn-descargar:hover { background: #c0392b; }
+        .btn-descargar:disabled { background: #95a5a6; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <h1>🛸 Buzón Efímero</h1>
+    <p class="subtitulo">Sube un archivo. Quien lo descargue, lo destruirá del servidor.</p>
+    
+    <div class="caja-subida">
+        <input type="file" id="file-input" onchange="subirArchivo(event)">
+        <button class="btn-subir" onclick="document.getElementById('file-input').click()">+ Seleccionar Archivo</button>
+        <div id="estado-subida" style="margin-top: 15px; font-size: 14px; color: #f1c40f;"></div>
+    </div>
+
+    <div class="lista-archivos" id="contenedor">
+        <!-- Los archivos aparecerán aquí -->
+    </div>
+
+    <script>
+        const POCKETBASE_HOST = `http://${window.location.hostname}:8090`;
+        const API_URL = `${POCKETBASE_HOST}/api/collections/Transfer/records`;
+        const contenedor = document.getElementById('contenedor');
+        const estadoSubida = document.getElementById('estado-subida');
+
+        window.cargarArchivos = async () => {
+            try {
+                const res = await fetch(`${API_URL}?sort=-created`);
+                const data = await res.json();
+                
+                contenedor.innerHTML = '';
+                if(data.items.length === 0) {
+                    contenedor.innerHTML = '<p style="text-align:center; color:#bdc3c7;">No hay archivos en el buzón actualmente.</p>';
+                    return;
+                }
+
+                data.items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'archivo';
+                    
+                    div.innerHTML = `
+                        <div class="archivo-info">
+                            <span class="archivo-nombre" title="${item.nombre}">${item.nombre}</span>
+                            <span class="archivo-peso">Listo para recoger</span>
+                        </div>
+                        <button class="btn-descargar" id="btn-${item.id}" onclick="descargarYBorrar('${item.id}', '${item.archivo}', '${item.nombre}')">
+                            📥 Descargar y Destruir
+                        </button>
+                    `;
+                    contenedor.appendChild(div);
+                });
+            } catch (error) {
+                contenedor.innerHTML = `<p style="color:#e74c3c;">Error al cargar. Revisa PocketBase.</p>`;
+            }
+        };
+
+        window.subirArchivo = async (event) => {
+            const file = event.target.files[0];
+            if(!file) return;
+
+            estadoSubida.innerText = "Subiendo archivo al servidor...";
+            
+            const formData = new FormData();
+            formData.append('nombre', file.name);
+            formData.append('archivo', file);
+
+            try {
+                const res = await fetch(API_URL, { method: 'POST', body: formData });
+                if(!res.ok) throw new Error("Fallo al subir");
+                estadoSubida.innerText = "¡Archivo en el buzón!";
+                setTimeout(() => estadoSubida.innerText = "", 3000);
+                cargarArchivos();
+            } catch (error) { 
+                estadoSubida.innerText = "Error al subir el archivo."; 
+            }
+            
+            event.target.value = ''; 
+        };
+
+        window.descargarYBorrar = async (id, archivoPB, nombreOriginal) => {
+            const btn = document.getElementById(`btn-${id}`);
+            btn.innerText = "⏳ Extrayendo...";
+            btn.disabled = true;
+
+            const fileUrl = `${POCKETBASE_HOST}/api/files/Transfer/${id}/${archivoPB}?download=1`;
+
+            try {
+                // 1. Traer el archivo a la memoria del navegador
+                const response = await fetch(fileUrl);
+                if(!response.ok) throw new Error("No se pudo descargar");
+                const blob = await response.blob();
+
+                // 2. Forzar la descarga local
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = nombreOriginal;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+
+                // 3. Destruir el registro en PocketBase
+                await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                
+                // Recargar lista
+                cargarArchivos();
+            } catch (error) {
+                alert("Error durante la descarga o el borrado.");
+                btn.innerText = "📥 Descargar y Destruir";
+                btn.disabled = false;
+            }
+        };
+
+        // Iniciar
+        cargarArchivos();
+    </script>
+</body>
+</html>

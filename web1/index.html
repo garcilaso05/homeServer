@@ -1,0 +1,721 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#172554">
+<title>LógicaLab — Juegos de lógica</title>
+<style>
+:root {
+  --bg: #f4f6fb;
+  --panel: #fff;
+  --ink: #182238;
+  --muted: #64748b;
+  --accent: #3157c8;
+  --line: #dbe2ee;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.45 system-ui, sans-serif;
+}
+header {
+  background: #172554;
+  color: white;
+  padding: 18px max(16px, calc((100% - 950px)/2));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.brand { font-size: 1.35rem; font-weight: 800; }
+.brand span { color: #a9c0ff; }
+nav { display: flex; gap: 8px; }
+nav button {
+  border: 1px solid #ffffff40;
+  background: transparent;
+  color: white;
+  padding: 9px 13px;
+  border-radius: 9px;
+  cursor: pointer;
+  font: inherit;
+}
+nav button.active, nav button:hover {
+  background: white;
+  color: #172554;
+}
+main { max-width: 950px; margin: 28px auto; padding: 0 16px 40px; }
+h1 { font-size: clamp(1.6rem, 4vw, 2.2rem); margin: 0 0 5px; }
+.intro { color: var(--muted); margin-bottom: 22px; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  padding: clamp(13px, 3vw, 23px);
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 18px;
+}
+button, select { font: inherit; }
+select, .btn {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+  color: var(--ink);
+}
+button { cursor: pointer; }
+.btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+.status { color: var(--muted); font-size: .9rem; }
+.hidden { display: none !important; }
+.help { color: var(--muted); font-size: .9rem; margin-bottom: 0; }
+
+.sudoku-wrap { display: flex; justify-content: center; }
+.sudoku {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  width: min(100%, 510px);
+  aspect-ratio: 1;
+  border: 2px solid #263653;
+  gap: 1px;
+  background: #263653;
+}
+.s-cell {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: white;
+  color: #172554;
+  text-align: center;
+  font-size: clamp(14px, 3.4vw, 23px);
+}
+.s-cell.given { background: #edf1f8; font-weight: 800; }
+.s-cell.same { background: #e6edff; }
+.s-cell.selected { outline: 3px solid #3157c8; outline-offset: -3px; }
+.s-cell.conflict { background: #fecaca; color: #b91c1c; }
+.s-cell:nth-child(3n):not(:nth-child(9n)) { border-right: 2px solid #263653; }
+.s-cell:nth-child(n+19):nth-child(-n+27),
+.s-cell:nth-child(n+46):nth-child(-n+54) {
+  border-bottom: 2px solid #263653;
+}
+.num-pad {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 15px;
+}
+.num-btn {
+  width: clamp(30px, 8vw, 43px);
+  height: 42px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.mine-board {
+  display: grid;
+  gap: 3px;
+  width: min(100%, 470px);
+  margin: auto;
+}
+.mine-cell {
+  min-width: 0;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #e2e8f0;
+  color: #172554;
+  font-weight: 800;
+  font-size: clamp(11px, 2.5vw, 17px);
+}
+.mine-cell.open { background: white; border-color: #e2e8f0; }
+.mine-cell.flag { background: #dbeafe; }
+.mine-cell.n1 { color: #2563eb; }
+.mine-cell.n2 { color: #15803d; }
+.mine-cell.n3 { color: #dc2626; }
+.mine-cell.n4 { color: #6d28d9; }
+.mine-cell.boom { background: #fecaca; }
+.scoreline {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: var(--muted);
+}
+.scoreline strong { color: var(--ink); }
+
+.board2048 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  width: min(100%, 420px);
+  aspect-ratio: 1;
+  margin: auto;
+  padding: 8px;
+  border-radius: 12px;
+  background: #cbd5e1;
+  touch-action: none;
+}
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: #e2e8f0;
+  font-size: clamp(20px, 5vw, 36px);
+  font-weight: 800;
+  min-width: 0;
+}
+.tile.v2 { background: white; }
+.tile.v4 { background: #dbeafe; }
+.tile.v8 { background: #93c5fd; }
+.tile.v16 { background: #60a5fa; color: white; }
+.tile.v32 { background: #3b82f6; color: white; }
+.tile.v64 { background: #1d4ed8; color: white; }
+.tile.big { background: #4338ca; color: white; font-size: clamp(15px, 4vw, 27px); }
+
+@media (max-width: 560px) {
+  header { padding: 15px; }
+  nav { width: 100%; }
+  nav button { flex: 1; padding: 8px 5px; }
+  main { margin-top: 20px; }
+  .status { width: 100%; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Lógica<span>Lab</span></div>
+  <nav aria-label="Juegos">
+    <button class="active" data-game="sudoku">Sudoku</button>
+    <button data-game="mines">Buscaminas</button>
+    <button data-game="2048">2048</button>
+  </nav>
+</header>
+
+<main>
+  <div class="intro">
+    <h1 id="title">Sudoku</h1>
+    <div id="subtitle">Completa la cuadrícula sin repetir números en filas, columnas ni bloques.</div>
+  </div>
+
+  <section id="view-sudoku" class="panel">
+    <div class="toolbar">
+      <label for="sdiff">Dificultad</label>
+      <select id="sdiff">
+        <option value="easy">Fácil</option>
+        <option value="medium" selected>Media</option>
+        <option value="hard">Difícil</option>
+      </select>
+      <button class="btn primary" id="snew">Nuevo sudoku</button>
+      <button class="btn" id="scheck">Comprobar</button>
+      <button class="btn" id="shint">Pista</button>
+      <span class="status" id="sstatus" aria-live="polite"></span>
+    </div>
+    <div class="sudoku-wrap">
+      <div id="sboard" class="sudoku" role="grid" aria-label="Sudoku"></div>
+    </div>
+    <div id="numpad" class="num-pad"></div>
+    <div class="num-pad"><button class="btn" id="serase">Borrar casilla</button></div>
+    <p class="help">Selecciona una casilla y escribe un número, o utiliza los botones numéricos.</p>
+  </section>
+
+  <section id="view-mines" class="panel hidden">
+    <div class="toolbar">
+      <label for="mdiff">Dificultad</label>
+      <select id="mdiff">
+        <option value="easy">Fácil · 9×9</option>
+        <option value="medium" selected>Media · 12×12</option>
+        <option value="hard">Difícil · 16×16</option>
+      </select>
+      <button class="btn primary" id="mnew">Nueva partida</button>
+      <button class="btn" id="mflag">Modo bandera: no</button>
+      <span class="status" id="mstatus" aria-live="polite"></span>
+    </div>
+    <div class="scoreline">
+      <span>Minas restantes: <strong id="mcount">0</strong></span>
+      <span>Tiempo: <strong id="mtime">0 s</strong></span>
+    </div>
+    <div id="mboard" class="mine-board" role="grid" aria-label="Buscaminas"></div>
+    <p class="help">Pulsa para abrir. Activa el modo bandera para marcar minas. La primera casilla y sus vecinas siempre serán seguras.</p>
+  </section>
+
+  <section id="view-2048" class="panel hidden">
+    <div class="toolbar">
+      <button class="btn primary" id="gnew">Nueva partida</button>
+      <button class="btn" id="gundo">Deshacer</button>
+      <span class="status" id="gstatus" aria-live="polite"></span>
+    </div>
+    <div class="scoreline">
+      <span>Puntuación: <strong id="gscore">0</strong></span>
+      <span>Récord: <strong id="gbest">0</strong></span>
+    </div>
+    <div id="gboard" class="board2048" role="grid" aria-label="Tablero 2048"></div>
+    <p class="help">Usa las flechas, los botones o desliza en el tablero para mover las fichas.</p>
+    <div class="num-pad">
+      <button class="btn" data-move="up">↑</button>
+      <button class="btn" data-move="left">←</button>
+      <button class="btn" data-move="down">↓</button>
+      <button class="btn" data-move="right">→</button>
+    </div>
+  </section>
+</main>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const shuffle = a => {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+const clone = a => a.map(row => row.slice());
+
+/* NAVEGACIÓN */
+let activeGame = 'sudoku';
+const descriptions = {
+  sudoku: ['Sudoku', 'Completa la cuadrícula sin repetir números en filas, columnas ni bloques.'],
+  mines: ['Buscaminas', 'Encuentra las casillas seguras y evita las minas.'],
+  '2048': ['2048', 'Combina fichas iguales para alcanzar 2048.']
+};
+document.querySelectorAll('[data-game]').forEach(button => {
+  button.addEventListener('click', () => {
+    activeGame = button.dataset.game;
+    document.querySelectorAll('[data-game]').forEach(b =>
+      b.classList.toggle('active', b === button));
+    ['sudoku', 'mines', '2048'].forEach(game =>
+      $('view-' + game).classList.toggle('hidden', game !== activeGame));
+    $('title').textContent = descriptions[activeGame][0];
+    $('subtitle').textContent = descriptions[activeGame][1];
+  });
+});
+
+/* SUDOKU: backtracking con orden aleatorio y solución única */
+let solution = [], puzzle = [], selected = -1;
+
+function candidates(grid, r, c) {
+  const used = new Set();
+  for (let i = 0; i < 9; i++) {
+    used.add(grid[r][i]);
+    used.add(grid[i][c]);
+  }
+  const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+  for (let y = br; y < br + 3; y++)
+    for (let x = bc; x < bc + 3; x++) used.add(grid[y][x]);
+  return [1,2,3,4,5,6,7,8,9].filter(n => !used.has(n));
+}
+
+function solveRandom(grid) {
+  let best = null, choices = null;
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (grid[r][c]) continue;
+      const opts = candidates(grid, r, c);
+      if (!opts.length) return false;
+      if (!choices || opts.length < choices.length) {
+        best = [r, c];
+        choices = opts;
+      }
+    }
+  }
+  if (!best) return true;
+  const [r, c] = best;
+  for (const n of shuffle(choices)) {
+    grid[r][c] = n;
+    if (solveRandom(grid)) return true;
+    grid[r][c] = 0;
+  }
+  return false;
+}
+
+function countSolutions(grid, limit = 2) {
+  let best = null, choices = null;
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (grid[r][c]) continue;
+      const opts = candidates(grid, r, c);
+      if (!opts.length) return 0;
+      if (!choices || opts.length < choices.length) {
+        best = [r, c];
+        choices = opts;
+      }
+    }
+  }
+  if (!best) return 1;
+  let total = 0;
+  const [r, c] = best;
+  for (const n of choices) {
+    grid[r][c] = n;
+    total += countSolutions(grid, limit - total);
+    grid[r][c] = 0;
+    if (total >= limit) return total;
+  }
+  return total;
+}
+
+function newSudoku() {
+  $('sstatus').textContent = 'Generando…';
+  const full = Array.from({length: 9}, () => Array(9).fill(0));
+  solveRandom(full);
+  solution = clone(full);
+  puzzle = clone(full);
+
+  const target = {easy: 34, medium: 45, hard: 52}[$('sdiff').value];
+  let removed = 0;
+  for (const index of shuffle(Array.from({length: 81}, (_, i) => i))) {
+    if (removed >= target) break;
+    const r = Math.floor(index / 9), c = index % 9;
+    const old = puzzle[r][c];
+    puzzle[r][c] = 0;
+    if (countSolutions(clone(puzzle)) === 1) removed++;
+    else puzzle[r][c] = old;
+  }
+  selected = -1;
+  drawSudoku();
+  $('sstatus').textContent = '';
+}
+
+function conflicts(r, c) {
+  const n = puzzle[r][c];
+  if (!n) return false;
+  for (let i = 0; i < 9; i++) {
+    if (i !== c && puzzle[r][i] === n) return true;
+    if (i !== r && puzzle[i][c] === n) return true;
+  }
+  const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+  for (let y = br; y < br + 3; y++)
+    for (let x = bc; x < bc + 3; x++)
+      if ((y !== r || x !== c) && puzzle[y][x] === n) return true;
+  return false;
+}
+
+function drawSudoku() {
+  const board = $('sboard');
+  board.innerHTML = '';
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const index = r * 9 + c;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 's-cell';
+      button.textContent = puzzle[r][c] || '';
+      button.setAttribute('role', 'gridcell');
+      if (solution.length && puzzle[r][c] && conflicts(r, c))
+        button.classList.add('conflict');
+      if (solution.length && puzzle[r][c] && puzzle[r][c] === solution[r][c] &&
+          initialPuzzle[r][c]) button.classList.add('given');
+      else if (initialPuzzle[r][c]) button.classList.add('given');
+      if (selected === index) button.classList.add('selected');
+      else if (selected >= 0) {
+        const sr = Math.floor(selected / 9), sc = selected % 9;
+        if (sr === r || sc === c ||
+            (Math.floor(sr / 3) === Math.floor(r / 3) &&
+             Math.floor(sc / 3) === Math.floor(c / 3)))
+          button.classList.add('same');
+      }
+      button.setAttribute('aria-label', `Fila ${r+1}, columna ${c+1}, ${puzzle[r][c] || 'vacía'}`);
+      button.addEventListener('click', () => {
+        selected = index;
+        drawSudoku();
+      });
+      board.appendChild(button);
+    }
+  }
+}
+
+let initialPuzzle = [];
+function enterNumber(n) {
+  if (selected < 0) return;
+  const r = Math.floor(selected / 9), c = selected % 9;
+  if (initialPuzzle[r][c]) return;
+  puzzle[r][c] = n;
+  drawSudoku();
+}
+function eraseNumber() {
+  if (selected < 0) return;
+  const r = Math.floor(selected / 9), c = selected % 9;
+  if (initialPuzzle[r][c]) return;
+  puzzle[r][c] = 0;
+  drawSudoku();
+}
+function sudokuCheck() {
+  let empty = 0, wrong = 0, invalid = 0;
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    if (!puzzle[r][c]) empty++;
+    else {
+      if (conflicts(r, c)) invalid++;
+      if (puzzle[r][c] !== solution[r][c]) wrong++;
+    }
+  }
+  if (!empty && !wrong && !invalid) $('sstatus').textContent = '¡Sudoku completado!';
+  else if (wrong || invalid) $('sstatus').textContent = 'Hay números incorrectos o repetidos.';
+  else $('sstatus').textContent = `Quedan ${empty} casillas vacías.`;
+}
+function sudokuHint() {
+  const blanks = [];
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++)
+    if (!initialPuzzle[r][c] && puzzle[r][c] !== solution[r][c]) blanks.push([r,c]);
+  if (!blanks.length) {
+    $('sstatus').textContent = 'No necesitas más pistas.';
+    return;
+  }
+  const [r,c] = blanks[Math.floor(Math.random() * blanks.length)];
+  puzzle[r][c] = solution[r][c];
+  selected = r * 9 + c;
+  drawSudoku();
+  $('sstatus').textContent = `Pista: fila ${r+1}, columna ${c+1}.`;
+}
+$('snew').addEventListener('click', newSudoku);
+$('scheck').addEventListener('click', sudokuCheck);
+$('shint').addEventListener('click', sudokuHint);
+$('serase').addEventListener('click', eraseNumber);
+for (let n = 1; n <= 9; n++) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'num-btn'; b.textContent = n;
+  b.addEventListener('click', () => enterNumber(n));
+  $('numpad').appendChild(b);
+}
+document.addEventListener('keydown', e => {
+  if (activeGame === 'sudoku' && /^[1-9]$/.test(e.key)) enterNumber(Number(e.key));
+  if (activeGame === 'sudoku' && (e.key === 'Backspace' || e.key === 'Delete')) eraseNumber();
+  if (activeGame === '2048') {
+    const dirs = {ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right'};
+    if (dirs[e.key]) { e.preventDefault(); move2048(dirs[e.key]); }
+  }
+});
+
+/* BUSCAMINAS */
+let mr, mc, mineTotal, cells, started, gameOver, flagMode;
+let flags = 0, opened = 0, timer = null, startTime = 0;
+
+function newMines() {
+  clearInterval(timer);
+  [mr, mc, mineTotal] = $('mdiff').value === 'easy' ? [9,9,10] :
+    $('mdiff').value === 'hard' ? [16,16,40] : [12,12,22];
+  cells = Array.from({length: mr*mc}, () =>
+    ({mine:false, open:false, flag:false, n:0}));
+  started = false; gameOver = false; flagMode = false; flags = 0; opened = 0;
+  $('mflag').textContent = 'Modo bandera: no';
+  $('mstatus').textContent = '';
+  $('mtime').textContent = '0 s';
+  $('mcount').textContent = mineTotal;
+  drawMines();
+}
+function neighbors(i) {
+  const r = Math.floor(i/mc), c = i%mc, result = [];
+  for (let y = Math.max(0,r-1); y <= Math.min(mr-1,r+1); y++)
+    for (let x = Math.max(0,c-1); x <= Math.min(mc-1,c+1); x++) {
+      const j = y*mc+x;
+      if (j !== i) result.push(j);
+    }
+  return result;
+}
+function setupMines(safe) {
+  const forbidden = new Set([safe, ...neighbors(safe)]);
+  const available = shuffle(cells.map((_,i)=>i).filter(i=>!forbidden.has(i)));
+  for (let i = 0; i < mineTotal; i++) cells[available[i]].mine = true;
+  cells.forEach((cell,i) => cell.n = neighbors(i).filter(j=>cells[j].mine).length);
+  started = true;
+  startTime = Date.now();
+  timer = setInterval(() => {
+    $('mtime').textContent = Math.floor((Date.now()-startTime)/1000) + ' s';
+  }, 1000);
+}
+function drawMines() {
+  const board = $('mboard');
+  board.innerHTML = '';
+  board.style.gridTemplateColumns = `repeat(${mc}, minmax(0, 1fr))`;
+  cells.forEach((cell,i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'mine-cell';
+    b.setAttribute('role', 'gridcell');
+    if (cell.open) {
+      b.classList.add('open');
+      if (cell.mine) { b.textContent = '✹'; b.classList.add('boom'); }
+      else if (cell.n) { b.textContent = cell.n; b.classList.add('n'+Math.min(cell.n,4)); }
+    } else if (cell.flag) { b.textContent = '⚑'; b.classList.add('flag'); }
+    b.addEventListener('click', () => mineClick(i));
+    b.addEventListener('contextmenu', e => { e.preventDefault(); toggleFlag(i); });
+    board.appendChild(b);
+  });
+}
+function toggleFlag(i) {
+  if (gameOver || cells[i].open) return;
+  cells[i].flag = !cells[i].flag;
+  flags += cells[i].flag ? 1 : -1;
+  $('mcount').textContent = mineTotal - flags;
+  drawMines();
+}
+function reveal(i) {
+  if (gameOver || cells[i].open || cells[i].flag) return;
+  cells[i].open = true;
+  if (cells[i].mine) {
+    gameOver = true; clearInterval(timer);
+    cells.forEach(c => { if (c.mine) c.open = true; });
+    $('mstatus').textContent = 'Has encontrado una mina. ¡Prueba otra vez!';
+    drawMines(); return;
+  }
+  opened++;
+  if (cells[i].n === 0) neighbors(i).forEach(j => {
+    if (!cells[j].open && !cells[j].mine) reveal(j);
+  });
+  if (opened === cells.length - mineTotal) {
+    gameOver = true; clearInterval(timer);
+    $('mstatus').textContent = '¡Has ganado!';
+  }
+  drawMines();
+}
+function mineClick(i) {
+  if (gameOver) return;
+  if (flagMode) { toggleFlag(i); return; }
+  if (!started) setupMines(i);
+  reveal(i);
+}
+$('mnew').addEventListener('click', newMines);
+$('mdiff').addEventListener('change', newMines);
+$('mflag').addEventListener('click', () => {
+  flagMode = !flagMode;
+  $('mflag').textContent = 'Modo bandera: ' + (flagMode ? 'sí' : 'no');
+});
+
+/* 2048 */
+let grid, score = 0, previous = null, best = 0, game2048Over = false;
+let touchStart = null;
+try { best = Number(localStorage.getItem('logiclab-best')) || 0; } catch {}
+function new2048() {
+  grid = Array.from({length:4}, () => Array(4).fill(0));
+  score = 0; previous = null; game2048Over = false;
+  addTile(); addTile();
+  $('gstatus').textContent = '';
+  draw2048();
+}
+function addTile() {
+  const empty = [];
+  for (let r=0;r<4;r++) for (let c=0;c<4;c++) if (!grid[r][c]) empty.push([r,c]);
+  if (empty.length) {
+    const [r,c] = empty[Math.floor(Math.random()*empty.length)];
+    grid[r][c] = Math.random() < .9 ? 2 : 4;
+  }
+}
+function draw2048() {
+  $('gboard').innerHTML = '';
+  for (const row of grid) for (const v of row) {
+    const tile = document.createElement('div');
+    tile.className = 'tile ' + (v ? (v<=64 ? 'v'+v : 'big') : '');
+    tile.textContent = v || '';
+    tile.setAttribute('role','gridcell');
+    $('gboard').appendChild(tile);
+  }
+  $('gscore').textContent = score;
+  $('gbest').textContent = best;
+}
+function canMove() {
+  for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
+    if (!grid[r][c]) return true;
+    if (c<3 && grid[r][c]===grid[r][c+1]) return true;
+    if (r<3 && grid[r][c]===grid[r+1][c]) return true;
+  }
+  return false;
+}
+function move2048(direction) {
+  if (game2048Over) return;
+  const old = clone(grid), oldScore = score;
+  const next = Array.from({length:4},()=>Array(4).fill(0));
+  for (let i=0;i<4;i++) {
+    let line = [];
+    for (let j=0;j<4;j++) {
+      const r = direction==='up' ? j : direction==='down' ? 3-j : i;
+      const c = direction==='left' ? j : direction==='right' ? 3-j : i;
+      line.push(grid[r][c]);
+    }
+    line = line.filter(Boolean);
+    const merged = [];
+    for (let k=0;k<line.length;k++) {
+      if (line[k]===line[k+1]) {
+        merged.push(line[k]*2); score += line[k]*2; k++;
+      } else merged.push(line[k]);
+    }
+    while (merged.length<4) merged.push(0);
+    for (let j=0;j<4;j++) {
+      const r = direction==='up' ? j : direction==='down' ? 3-j : i;
+      const c = direction==='left' ? j : direction==='right' ? 3-j : i;
+      next[r][c] = merged[j];
+    }
+  }
+  if (JSON.stringify(next)===JSON.stringify(grid)) { score=oldScore; return; }
+  previous = {grid:old, score:oldScore};
+  grid = next;
+  addTile();
+  if (score>best) {
+    best=score;
+    try { localStorage.setItem('logiclab-best', best); } catch {}
+  }
+  if (grid.some(row=>row.includes(2048)))
+    $('gstatus').textContent = '¡Has alcanzado 2048!';
+  if (!canMove()) {
+    game2048Over=true;
+    $('gstatus').textContent = 'No quedan movimientos. Empieza otra partida.';
+  }
+  draw2048();
+}
+$('gnew').addEventListener('click',new2048);
+$('gundo').addEventListener('click',()=>{
+  if (!previous) return;
+  grid=previous.grid; score=previous.score; previous=null;
+  game2048Over=false; $('gstatus').textContent=''; draw2048();
+});
+document.querySelectorAll('[data-move]').forEach(b =>
+  b.addEventListener('click',()=>move2048(b.dataset.move)));
+$('gboard').addEventListener('touchstart',e=>{
+  const t=e.changedTouches[0]; touchStart=[t.clientX,t.clientY];
+},{passive:true});
+$('gboard').addEventListener('touchend',e=>{
+  if (!touchStart) return;
+  const t=e.changedTouches[0], dx=t.clientX-touchStart[0], dy=t.clientY-touchStart[1];
+  touchStart=null;
+  if (Math.max(Math.abs(dx),Math.abs(dy))<25) return;
+  move2048(Math.abs(dx)>Math.abs(dy) ? (dx>0?'right':'left') : (dy>0?'down':'up'));
+},{passive:true});
+
+/* INICIALIZACIÓN */
+function startSudoku() {
+  const full = Array.from({length:9},()=>Array(9).fill(0));
+  solveRandom(full);
+  solution=clone(full); puzzle=clone(full);
+  const target={easy:34,medium:45,hard:52}[$('sdiff').value];
+  let removed=0;
+  for (const index of shuffle(Array.from({length:81},(_,i)=>i))) {
+    if (removed>=target) break;
+    const r=Math.floor(index/9),c=index%9,old=puzzle[r][c];
+    puzzle[r][c]=0;
+    if (countSolutions(clone(puzzle))===1) removed++;
+    else puzzle[r][c]=old;
+  }
+  initialPuzzle=clone(puzzle);
+  selected=-1; drawSudoku(); $('sstatus').textContent='';
+}
+$('snew').removeEventListener('click', newSudoku);
+$('snew').addEventListener('click', startSudoku);
+$('sdiff').addEventListener('change', startSudoku);
+startSudoku();
+newMines();
+new2048();
+</script>
+</body>
+</html>
